@@ -7,7 +7,7 @@ squarted = list(map(lambda x: x**2,numbers))
 print(squarted)
 
 
-
+print('GITHUB LESSON')
 
 
 
