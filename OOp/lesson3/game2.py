@@ -1,6 +1,7 @@
 import pygame
 import sys
 import random
+import datetime
 
 
 class Player(pygame.sprite.Sprite):
@@ -101,7 +102,7 @@ class Bullet(pygame.sprite.Sprite):
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, game_duration):
         pygame.init()
 
         # ОШИБКА 3 (опечатка): было screen_widht. Работало, но это ловушка.
@@ -114,6 +115,15 @@ class Game:
         self.clock = pygame.time.Clock()
         self.fps = 60
         self.is_running = True
+
+        self.game_over = False
+        self.score = 0
+        self.game_duration = game_duration
+        self.start_ticks = pygame.time.get_ticks()
+        self.time_left = game_duration
+        self.font = pygame.font.SysFont('arial', 40, bold=True)
+        self.big_font = pygame.font.SysFont('arial', 40, bold=True)
+
 
         self.all_sprites = pygame.sprite.Group()
         self.enemies = pygame.sprite.Group()
@@ -136,7 +146,9 @@ class Game:
     def run(self):
         while self.is_running:
             self._check_events()
-            self._update()
+            if not self.game_over:
+                self._update()
+
             self._draw()
 
             self.clock.tick(self.fps)
@@ -152,17 +164,75 @@ class Game:
                     self.is_running = False
 
     def _update(self):
+        seconds_passed = (pygame.time.get_ticks() - self.start_ticks) / 1000
+        self.time_left = max(0.0, self.game_duration - seconds_passed)
+
+        if self.time_left <= 0:
+            self.game_over = True
+            self._save_results()
+            return
+
         # ВАЖНО: сигнатура update у всех спрайтов должна быть (self, w, h),
         # иначе pygame.sprite.Group.update() упадёт на несовпадении аргументов.
         self.all_sprites.update(self.screen_width, self.screen_height)
+
+        hits = pygame.sprite.groupcollide(self.enemies, self.bullets, True, True)
+
+        for _ in hits:
+            self.score += 10
+            enemy = Enemy(self.screen_width)
+            self.all_sprites.add(enemy)
+            self.enemies.add(enemy)
+
+    def _save_results(self):
+        now = datetime.datetime.now()
+        line = f'{now}Время: {self.game_duration}сек | Очки: {self.score}\n'
+        with open ('result.txt', 'a', encoding='utf-8')as file:
+            file.write(line)
+
 
     def _draw(self):
         self.screen.fill((40, 44, 52))
         self.all_sprites.draw(self.screen)
 
+        score_text = self.font.render(
+            f'Счет: {self.score}', True, (152, 195, 121)
+        )
+        time_text = self.font.render(
+            f'Время: {self.time_left:.1f}c', True, (229, 192, 123)
+        )
+
+        self.screen.blit(score_text, (15, 15))
+        self.screen.blit(time_text, (-15,-15))
+
+        if self.game_over:
+            over_text = self.big_font.render(
+                "Время вышло!", True, (224, 100,177)
+            )
+            final_score = self.font.render(
+                f'Итоговый счет: {self.score}', True, (255,255,255)
+            )
+            self.screen.blit(
+                over_text,
+                over_text.get_rect(
+                    center = (self.screen_width // 2, self.screen_height // 2 - 30)
+                ),
+
+            )
+
+            self.screen.blit(
+                final_score,
+                final_score.get_rect(
+                    center = (self.screen_width // 2, self.screen_height // 2 +20)
+                ),
+            )
+
+
         pygame.display.flip()
 
 
 if __name__ == "__main__":
-    game = Game()
+    user_input = input('Сколько секунд будете играть? ')
+    duration = int(user_input) if user_input.isdigit() else 30
+    game = Game(duration)
     game.run()
